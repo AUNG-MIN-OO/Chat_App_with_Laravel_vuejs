@@ -2,7 +2,12 @@
     <app-layout title="Dashboard">
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Chat
+                <chat-room-selection
+                    v-if="currentRoom.id"
+                    :rooms="chatRooms"
+                    :currentRoom ="currentRoom"
+                    v-on:roomChanged="setRoom($event)"
+                />
             </h2>
         </template>
 
@@ -22,9 +27,11 @@ import { defineComponent } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import MessageContainer from "@/Pages/Chat/MessageContainer";
 import InputMessage from "@/Pages/Chat/InputMessage";
+import ChatRoomSelection from "@/Pages/Chat/ChatRoomSelection";
 
 export default defineComponent({
     components: {
+        ChatRoomSelection,
         InputMessage,
         MessageContainer,
         AppLayout,
@@ -36,7 +43,27 @@ export default defineComponent({
             messages : [],
         }
     },
+    watch:{
+        currentRoom(val,oldVal){
+            if (oldVal.id){
+                this.connect(oldVal );
+            }
+            this.connect();
+        }
+    },
     methods: {
+        connect(){
+            if (this.currentRoom.id){
+                let vm = this;
+                this.getMessages();
+                window.Echo.private("chat."+this.currentRoom.id).listen('.message.new',e=>{
+                    vm.getMessages();
+                })
+            }
+        },
+        disconnect(room){
+            window.Echo.leave('chat.'+room.id);
+        },
         getRooms() {
             axios.get('/chat/rooms')
             .then(response=>{
@@ -47,7 +74,6 @@ export default defineComponent({
         },
         setRoom(room) {
             this.currentRoom = room;
-            this.getMessages();
         },
         getMessages(){
             axios.get('/chat/room/'+this.currentRoom.id+'/messages')
